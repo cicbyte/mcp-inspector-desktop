@@ -6,9 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  release:
-    permissions:
-      contents: write
+  build:
     strategy:
       fail-fast: false
       matrix:
@@ -51,13 +49,55 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Build and release
-        uses: tauri-apps/tauri-action@v0.5.20
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Tauri app
+        run: npm run tauri build -- ${{ matrix.args }}
+
+      - name: Collect and rename artifacts
+        shell: bash
+        run: |
+          mkdir -p output
+          find src-tauri/target -type f \( \
+            -name "*.exe" -o \
+            -name "*.msi" -o \
+            -name "*.dmg" -o \
+            -name "*.AppImage" -o \
+            -name "*.deb" -o \
+            -name "*.rpm" -o \
+            -name "*.app.tar.gz" \
+          \) -not -path "*/.tauri/*" | while read f; do
+            base=$(basename "$f")
+            case "$base" in
+              *.exe|*.msi)             new="windows_$base" ;;
+              *.dmg|*.app.tar.gz)      new="macos_$base" ;;
+              *.AppImage|*.deb|*.rpm)  new="linux_$base" ;;
+              *)                       new="$base" ;;
+            esac
+            cp "$f" "output/$new"
+            echo "  $new"
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: v__VERSION__
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+          name: artifacts-${{ strategy.job-index }}
+          path: output/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: artifacts/*

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { ask } from "@tauri-apps/plugin-dialog";
 import Launcher from "./components/Launcher";
 import InspectorView from "./components/InspectorView";
 
@@ -106,15 +107,48 @@ function App() {
       // 不要立即切换视图，等待收到完整 URL
     } catch (error) {
       console.error("Failed to start inspector:", error);
-      setLogs((prev) => [
-        ...prev,
-        {
-          type: "system",
-          text: `启动失败: ${error}`,
-          timestamp: new Date(),
-        },
-      ]);
-      throw error;
+
+      if (String(error) === "mcp-inspector not found") {
+        const yes = await ask("未检测到 @modelcontextprotocol/inspector，是否立即安装？", {
+          title: "安装确认",
+          okLabel: "是",
+          cancelLabel: "否",
+        });
+        if (yes) {
+          try {
+            await invoke("install_inspector");
+            // 安装成功后自动重新启动
+            await invoke("start_inspector");
+          } catch (installError) {
+            setLogs((prev) => [
+              ...prev,
+              {
+                type: "system",
+                text: `安装或启动失败: ${installError}`,
+                timestamp: new Date(),
+              },
+            ]);
+          }
+        } else {
+          setLogs((prev) => [
+            ...prev,
+            {
+              type: "system",
+              text: "已取消安装",
+              timestamp: new Date(),
+            },
+          ]);
+        }
+      } else {
+        setLogs((prev) => [
+          ...prev,
+          {
+            type: "system",
+            text: `启动失败: ${error}`,
+            timestamp: new Date(),
+          },
+        ]);
+      }
     }
   };
 

@@ -18,9 +18,8 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 pub struct InspectorHandle {
     child: Option<Child>,
     client_port: u16,
-    server_port: u16,
-    session_id: String,
-    auth_token: String,
+    _server_port: u16,
+    _session_id: String,
     _log_thread: Option<thread::JoinHandle<()>>,
 }
 
@@ -94,8 +93,6 @@ impl InspectorHandle {
         let server_port_for_url = server_port;
 
         let log_thread = thread::spawn(move || {
-            let mut auth_token = String::new();
-
             // 读取 stdout，捕获认证令牌
             let stdout_reader = BufReader::new(stdout);
             for line in stdout_reader.lines() {
@@ -103,7 +100,7 @@ impl InspectorHandle {
                     // 检查是否是认证令牌行
                     if text.contains("Session token:") {
                         if let Some(token_part) = text.split("Session token:").nth(1) {
-                            auth_token = token_part.trim().to_string();
+                            let auth_token = token_part.trim();
                             // 发送完整 URL 到前端
                             let full_url = format!(
                                 "http://localhost:{}?MCP_PROXY_PORT={}&MCP_PROXY_AUTH_TOKEN={}",
@@ -145,9 +142,8 @@ impl InspectorHandle {
         Ok(Self {
             child: Some(child),
             client_port,
-            server_port,
-            session_id,
-            auth_token: String::new(),
+            _server_port: server_port,
+            _session_id: session_id,
             _log_thread: Some(log_thread),
         })
     }
@@ -195,16 +191,4 @@ impl Drop for InspectorHandle {
             }
         }
     }
-}
-
-/// 在指定范围内选择未使用的端口
-fn pick_unused_port_in_range(min: u16, max: u16) -> Option<u16> {
-    let mut port = pick_unused_port();
-    while let Some(p) = port {
-        if p >= min && p <= max {
-            return Some(p);
-        }
-        port = pick_unused_port();
-    }
-    None
 }

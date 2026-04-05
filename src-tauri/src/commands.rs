@@ -3,8 +3,9 @@ use crate::inspector::InspectorHandle;
 use crate::state::AppState;
 use chrono::Utc;
 use std::collections::HashMap;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tauri::{Emitter, State, Window};
 
 // Windows 平台特定配置：隐藏子进程控制台窗口
@@ -187,4 +188,73 @@ pub fn delete_profile(state: State<'_, AppState>, id: String) -> Result<(), Stri
         .map_err(|e| format!("Failed to save config: {}", e))?;
 
     Ok(())
+}
+
+/// 安装 @modelcontextprotocol/inspector
+#[tauri::command]
+pub async fn install_inspector(window: Window) -> Result<(), String> {
+    let _ = window.emit("inspector-log", serde_json::json!({
+        "type": "system",
+        "text": "正在安装 @modelcontextprotocol/inspector ...",
+        "sessionId": ""
+    }));
+
+    let mut cmd = Command::new("npm");
+    cmd.args(["install", "-g", "@modelcontextprotocol/inspector"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("启动 npm 失败: {}", e))?;
+
+    // 读取 stdout
+    if let Some(stdout) = child.stdout.take() {
+        let reader = BufReader::new(stdout);
+        let window_clone = window.clone();
+        for line in reader.lines().flatten() {
+            let _ = window_clone.emit("inspector-log", serde_json::json!({
+                "type": "stdout",
+                "text": line,
+                "sessionId": ""
+            }));
+        }
+    }
+
+    // 读取 stderr
+    if let Some(stderr) = child.stderr.take() {
+        let reader = BufReader::new(stderr);
+        let window_clone = window.clone();
+        for line in reader.lines().flatten() {
+            let _ = window_clone.emit("inspector-log", serde_json::json!({
+                "type": "stderr",
+                "text": line,
+                "sessionId": ""
+            }));
+        }
+    }
+
+    let status = child
+        .wait()
+        .map_err(|e| format!("等待 npm 进程失败: {}", e))?;
+
+    if status.success() {
+        let _ = window.emit("inspector-log", serde_json::json!({
+            "type": "system",
+            "text": "安装完成！",
+            "sessionId": ""
+        }));
+        Ok(())
+    } else {
+        let msg = format!("安装失败，退出码: {}", status.code().unwrap_or(-1));
+        let _ = window.emit("inspector-log", serde_json::json!({
+            "type": "stderr",
+            "text": &msg,
+            "sessionId": ""
+        }));
+        Err(msg)
+    }
 }

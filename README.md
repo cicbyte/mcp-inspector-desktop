@@ -16,6 +16,16 @@
 - **自动端口分配**：智能选择可用端口，避免端口冲突
 - **认证令牌处理**：自动捕获并处理 Inspector 认证令牌
 
+## 运行截图
+
+**启动页**
+
+![启动页](images/001.png)
+
+**Inspector 运行界面**
+
+![Inspector 运行界面](images/002.png)
+
 ## 前置要求
 
 ### 必需依赖
@@ -133,7 +143,35 @@ npm run tauri build -- --target x86_64-pc-windows-msvc
 4. **端口分配**：使用 `portpicker` 自动选择可用端口
 5. **浏览器阻止**：设置 `MCP_AUTO_OPEN_ENABLED=false` 环境变量防止浏览器自动打开
 
-## 故障排除
+## 常见问题
+
+### macOS 提示"无法打开，因为无法验证开发者"
+
+由于应用未经过 Apple 公证（notarization），首次打开时 macOS Gatekeeper 会阻止运行。
+
+**解决方法**（任选其一）：
+
+**方法一：通过系统设置（推荐）**
+
+1. 右键点击应用，选择「打开」
+2. 在弹出的对话框中点击「打开」
+3. 如果仍然无法打开，前往「系统设置」→「隐私与安全性」→ 向下滚动找到安全性部分 → 点击「仍要打开」
+
+**方法二：通过终端移除隔离属性**
+
+```bash
+xattr -cr /Applications/MCP\ Inspector\ Desktop.app
+```
+
+**方法三：全局允许任何来源的应用**
+
+```bash
+sudo spctl --master-disable
+```
+
+> ⚠️ 方法三会降低系统安全性，建议仅在自己了解风险的情况下使用，使用后可通过 `sudo spctl --master-enable` 恢复。
+
+### Inspector 无法启动
 
 ### Inspector 无法启动
 

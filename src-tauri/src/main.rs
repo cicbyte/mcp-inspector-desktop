@@ -23,6 +23,7 @@ pub fn run() {
             get_recent_profiles,
             save_profile,
             delete_profile,
+            install_inspector,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]
