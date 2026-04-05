@@ -2,7 +2,7 @@
 name = "mcp-inspector-desktop"
 version = "0.1.0"
 description = "MCP Inspector Desktop - Tauri 应用"
-authors = ["you"]
+authors = ["cicbyte"]
 license = ""
 repository = ""
 edition = "2021"
