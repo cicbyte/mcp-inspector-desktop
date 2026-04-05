@@ -2,6 +2,15 @@ mod process;
 
 pub use process::InspectorHandle;
 
+/// 返回当前平台上 mcp-inspector CLI 的命令名
+pub fn inspector_command() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "mcp-inspector.cmd"
+    } else {
+        "mcp-inspector"
+    }
+}
+
 /// Inspector 进程相关错误
 #[derive(thiserror::Error, Debug)]
 pub enum InspectorError {

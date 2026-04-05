@@ -49,8 +49,8 @@ impl InspectorHandle {
             "sessionId": ""
         }));
 
-        // 2. 使用 mcp-inspector.cmd（Windows）
-        let mut cmd = Command::new("mcp-inspector.cmd");
+        // 2. 使用 mcp-inspector CLI
+        let mut cmd = Command::new(super::inspector_command());
         cmd.current_dir(&working_dir)
             .env("CLIENT_PORT", client_port.to_string())
             .env("SERVER_PORT", server_port.to_string())

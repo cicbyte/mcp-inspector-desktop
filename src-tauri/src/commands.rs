@@ -28,7 +28,7 @@ pub async fn start_inspector(
     }));
 
     // 检查 mcp-inspector 是否可用
-    let mut check_cmd = Command::new("mcp-inspector.cmd");
+    let mut check_cmd = Command::new(crate::inspector::inspector_command());
     check_cmd.arg("--help");
 
     // Windows: 隐藏子进程的控制台窗口
