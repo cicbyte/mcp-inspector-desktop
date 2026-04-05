@@ -56,7 +56,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p output
-          find src-tauri/target -type f \( \
+          find src-tauri/target -path "*/release/bundle/*" -type f \( \
             -name "*.exe" -o \
             -name "*.msi" -o \
             -name "*.dmg" -o \
@@ -64,7 +64,7 @@ jobs:
             -name "*.deb" -o \
             -name "*.rpm" -o \
             -name "*.app.tar.gz" \
-          \) -not -path "*/.tauri/*" | while read f; do
+          \) | while read f; do
             base=$(basename "$f")
             case "$base" in
               *.exe|*.msi)             new="windows_$base" ;;
