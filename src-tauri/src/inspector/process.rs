@@ -29,6 +29,7 @@ impl InspectorHandle {
         window: Window,
         working_dir: PathBuf,
         env_vars: HashMap<String, String>,
+        inspector_path: String,
     ) -> Result<Self> {
         let _ = window.emit("inspector-log", serde_json::json!({
             "type": "system",
@@ -48,8 +49,8 @@ impl InspectorHandle {
             "sessionId": ""
         }));
 
-        // 2. 使用 mcp-inspector CLI
-        let mut cmd = Command::new(super::inspector_command());
+        // 2. 使用 mcp-inspector CLI（使用解析到的完整路径）
+        let mut cmd = Command::new(&inspector_path);
         cmd.current_dir(&working_dir)
             .env("CLIENT_PORT", client_port.to_string())
             .env("SERVER_PORT", server_port.to_string())

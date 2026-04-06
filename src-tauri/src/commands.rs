@@ -28,29 +28,23 @@ pub async fn start_inspector(
         "sessionId": ""
     }));
 
-    // 检查 mcp-inspector 是否可用
-    let mut check_cmd = Command::new(crate::inspector::inspector_command());
-    check_cmd.arg("--help");
-
-    // Windows: 隐藏子进程的控制台窗口
-    #[cfg(target_os = "windows")]
-    check_cmd.creation_flags(CREATE_NO_WINDOW);
-
-    let check_result = check_cmd.output();
-
-    if !check_result.is_ok() {
-        let error_msg = "未检测到 mcp-inspector。请运行以下命令安装：\nnpm install -g @modelcontextprotocol/inspector";
-        let _ = window.emit("inspector-log", serde_json::json!({
-            "type": "stderr",
-            "text": error_msg,
-            "sessionId": ""
-        }));
-        return Err("mcp-inspector not found".to_string());
-    }
+    // 检查 mcp-inspector 是否可用，解析完整路径
+    let inspector_path = match crate::inspector::resolve_command_path(crate::inspector::inspector_command()) {
+        Some(path) => path,
+        None => {
+            let error_msg = "未检测到 mcp-inspector。请运行以下命令安装：\nnpm install -g @modelcontextprotocol/inspector";
+            let _ = window.emit("inspector-log", serde_json::json!({
+                "type": "stderr",
+                "text": error_msg,
+                "sessionId": ""
+            }));
+            return Err("mcp-inspector not found".to_string());
+        }
+    };
 
     let _ = window.emit("inspector-log", serde_json::json!({
         "type": "system",
-        "text": "检测到 mcp-inspector",
+        "text": format!("检测到 mcp-inspector: {}", inspector_path),
         "sessionId": ""
     }));
 
@@ -77,6 +71,7 @@ pub async fn start_inspector(
         window.clone(),
         work_path,
         HashMap::new(),
+        inspector_path,
     )
     .map_err(|e| {
         let _ = window.emit("inspector-log", serde_json::json!({
