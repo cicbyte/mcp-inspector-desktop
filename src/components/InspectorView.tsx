@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface InspectorViewProps {
   url: string;
@@ -14,7 +14,9 @@ interface InspectorViewProps {
 export default function InspectorView({ url, onStop, logs, onClearLogs }: InspectorViewProps) {
   const [stopping, setStopping] = useState(false);
   const [logPanelOpen, setLogPanelOpen] = useState(false);
+  const [iframeKey, setIframeKey] = useState(0);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 调试：打印 URL 变化
   useEffect(() => {
@@ -28,6 +30,15 @@ export default function InspectorView({ url, onStop, logs, onClearLogs }: Inspec
     }
   }, [logs]);
 
+  // 清理重试定时器
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleStop = async () => {
     setStopping(true);
     try {
@@ -36,6 +47,28 @@ export default function InspectorView({ url, onStop, logs, onClearLogs }: Inspec
       setStopping(false);
     }
   };
+
+  const handleIframeLoad = useCallback(() => {
+    // iframe 加载成功，清除重试定时器
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, []);
+
+  // iframe 加载后设置重试：如果 WKWebView 首次加载失败（黑屏），延迟重试
+  useEffect(() => {
+    if (!url) return;
+    // 3 秒后尝试重新加载 iframe，应对 WKWebView 不自动重试的情况
+    retryTimerRef.current = setTimeout(() => {
+      setIframeKey((k) => k + 1);
+    }, 3000);
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
+    };
+  }, [url]);
 
   return (
     <div className="flex h-full flex-col">
@@ -70,10 +103,11 @@ export default function InspectorView({ url, onStop, logs, onClearLogs }: Inspec
         {/* Inspector iframe */}
         <div className={logPanelOpen ? "flex-1" : "flex-1"}>
           <iframe
-            key={url}  // 强制在 URL 变化时重新加载
+            key={`${url}-${iframeKey}`}
             src={url}
             className="h-full w-full border-0"
             title="MCP Inspector"
+            onLoad={handleIframeLoad}
           />
         </div>
 

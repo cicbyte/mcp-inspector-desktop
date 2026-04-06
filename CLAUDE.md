@@ -33,22 +33,22 @@ Tauri v2 双层架构
 └── src-tauri/        Rust 后端
     ├── src/
     │   ├── main.rs                Tauri Builder 配置，插件注册
-    │   ├── commands.rs            6 个 Tauri Command（start/stop/status/profile CRUD）
+    │   ├── commands.rs            7 个 Tauri Command（start/stop/status/install + profile CRUD）
     │   ├── state.rs               AppState（Mutex 包装 Inspector 句柄 + 配置）
     │   ├── inspector/
-    │   │   ├── mod.rs             InspectorError 错误类型
+    │   │   ├── mod.rs             InspectorError 错误类型 + 跨平台命令解析（login shell PATH）
     │   │   └── process.rs         InspectorHandle 进程管理核心（spawn/kill/is_running）
     │   └── config/
     │       ├── mod.rs             模块导出
     │       └── storage.rs         AppConfig/ServerProfile 数据结构 + 持久化
     ├── Cargo.toml
-    ├── tauri.conf.json            应用配置（标识、窗口、CSP、构建命令）
+    ├── tauri.conf.json            应用配置（withGlobalTauri, 窗口, CSP, 构建命令）
     └── capabilities/default.json  权限定义
 ```
 
 ## 通信模式
 
-- **前端 → 后端**：`invoke("command_name")` 调用 Tauri Command
+- **前端 → 后端**：`invoke("command_name")` 调用 Tauri Command（`withGlobalTauri: true`，也可通过 `window.__TAURI__` 访问）
 - **后端 → 前端**：`window.emit("event_name", payload)` 发送事件
 - 关键事件：`inspector-log`（日志）、`inspector-url-ready`（带认证令牌的完整 URL）、`inspector-exited`（进程退出）
 
@@ -64,12 +64,13 @@ Tauri v2 双层架构
 - ESM 模块系统（`"type": "module"`）
 - Rust Edition 2021，`thiserror` 自定义错误 + `anyhow` 通用错误
 - Mutex 保护共享状态（进程句柄、应用配置）
-- Windows 平台条件编译：`#[cfg(target_os = "windows")]`
+- Windows 平台条件编译：`#[cfg(target_os = "windows")]`，使用 `CREATE_NO_WINDOW` 隐藏子进程控制台
 
 ## 注意事项
 
-- 子进程命令当前硬编码为 `mcp-inspector.cmd`（Windows 特定），跨平台需适配
+- 跨平台命令解析：macOS/Linux 通过 login shell 执行 `which` 获取 CLI 路径（解决 GUI 应用不继承终端 PATH 的问题），Windows 直接尝试执行
 - stdout 解析依赖 `Session token:` 关键字，若 inspector CLI 输出格式变化需同步更新
 - CSP 设为 `null` 以允许 iframe 加载 localhost，生产环境需评估安全性
-- 配置持久化使用原子写入（先写 `.tmp` 再 `rename`）
+- 配置持久化使用原子写入（先写 `.tmp` 再 `rename`），存储在 `{系统配置目录}/mcp-inspector-desktop/config.json`
+- Debug 构建自动打开 DevTools（`main.rs` setup 中 `#[cfg(debug_assertions)]`）
 - 当前无测试框架、无 lint 工具、无 CI/CD

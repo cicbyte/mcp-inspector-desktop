@@ -95,24 +95,36 @@ impl InspectorHandle {
 
         let log_thread = thread::spawn(move || {
             // 读取 stdout，捕获认证令牌
+            let mut pending_url: Option<String> = None;
             let stdout_reader = BufReader::new(stdout);
             for line in stdout_reader.lines() {
                 if let Ok(text) = line {
-                    // 检查是否是认证令牌行
+                    // 检查是否是认证令牌行，构造 URL 但暂不发送
                     if text.contains("Session token:") {
                         if let Some(token_part) = text.split("Session token:").nth(1) {
                             let auth_token = token_part.trim();
-                            // 发送完整 URL 到前端
                             let full_url = format!(
                                 "http://localhost:{}?MCP_PROXY_PORT={}&MCP_PROXY_AUTH_TOKEN={}",
                                 client_port_for_url, server_port_for_url, auth_token
                             );
+                            pending_url = Some(full_url);
                             let _ = window_clone_for_token.emit("inspector-log", serde_json::json!({
                                 "type": "system",
-                                "text": format!("捕获到完整 URL: {}", full_url),
+                                "text": "捕获到 Session Token，等待 Inspector 就绪...",
                                 "sessionId": session_id_clone
                             }));
-                            let _ = window_clone_for_token.emit("inspector-url-ready", full_url);
+                        }
+                    }
+
+                    // Inspector 确认就绪后才发送 URL，避免 iframe 加载未就绪的服务
+                    if pending_url.is_some() && text.contains("up and running") {
+                        if let Some(url) = pending_url.take() {
+                            let _ = window_clone_for_token.emit("inspector-log", serde_json::json!({
+                                "type": "system",
+                                "text": format!("Inspector 已就绪: {}", url),
+                                "sessionId": session_id_clone
+                            }));
+                            let _ = window_clone_for_token.emit("inspector-url-ready", url);
                         }
                     }
 
@@ -122,6 +134,11 @@ impl InspectorHandle {
                         "sessionId": session_id_clone
                     }));
                 }
+            }
+
+            // 兜底：stdout 结束但 URL 未发送（Inspector 版本输出格式变化时）
+            if let Some(url) = pending_url.take() {
+                let _ = window_clone_for_log.emit("inspector-url-ready", url);
             }
 
             // 读取 stderr
